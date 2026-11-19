@@ -1,0 +1,19 @@
+{
+  "name": "notesnano",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "license": "Apache-2.0",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "firebase": "^13.4.0",
+    "pdfjs-dist": "^5.7.284"
+  },
+  "devDependencies": {
+    "vite": "^7.3.8"
+  }
+}
