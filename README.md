@@ -35,6 +35,7 @@ Most student laptops can now run a language model **inside Chrome**. NotesNano u
 | 📄 **Open a lecture PDF or paste notes** | The PDF is read in the browser with pdf.js and never uploaded. |
 | 📝 **Summarize** | A title, key points and key terms. Long lectures are split into parts, summarized, then merged into one revision sheet. |
 | ❓ **Quiz me** | 5 multiple-choice questions with explanations and a score. |
+| 💬 **Ask your notes** *(new)* | Ask a question in plain English. NotesNano finds the most relevant passages of your notes **on your laptop**, then the AI answers **only from those passages**, with a supporting quote and the passages it used. If the answer isn't in your notes, it says so instead of making something up. |
 | 🔀 **Choose where the AI runs** | **Auto**, **Private** or **Cloud** (see below). |
 | 📍 **See where it ran** | Every result shows how many steps ran on your laptop and how many in the cloud. |
 
@@ -61,6 +62,12 @@ flowchart LR
     G --> H[Summary + Quiz<br/>with on-device / cloud banner]
 ```
 
+### How "Ask your notes" works
+
+1. **Local retrieval, no AI:** [`src/ask.js`](src/ask.js) splits the notes into passages and scores each one against the question (TF-IDF-style keyword scoring). The best passages, up to about 6,000 characters, are kept. This keeps the prompt inside Gemini Nano's on-device input limit, even for long lectures.
+2. **One grounded AI call:** the question and the chosen passages go to the same hybrid Firebase AI Logic model, with a JSON schema: `found`, `answer`, `quote`.
+3. **Honest answers:** if `found` is false, the card is marked **"Not in your notes"**. Every answer shows where it ran (laptop or cloud), how long it took, and the passages it used, so you can check it.
+
 ### Firebase AI Logic, line by line
 
 | Where | What |
@@ -69,6 +76,7 @@ flowchart LR
 | [`src/ai.js`](src/ai.js) | `getGenerativeModel` with `mode`, `inCloudParams` (model, system instruction, JSON schema) and `onDeviceParams` (`createOptions`, `promptOptions.responseConstraint`) |
 | [`src/ai.js`](src/ai.js) | `initializeDeviceModel()` on the first click to download Gemini Nano, with progress |
 | [`src/ai.js`](src/ai.js) | **Structured JSON on both paths**: `Schema` for the cloud, JSON-schema `responseConstraint` for Gemini Nano |
+| [`src/ai.js`](src/ai.js) | `askNotes()`: grounded Q&A with a `found` / `answer` / `quote` schema on both paths |
 | [`src/main.js`](src/main.js) | `result.response.inferenceSource` to show on-device vs cloud for every step |
 
 ## Run it locally

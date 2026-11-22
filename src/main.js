@@ -1,4 +1,4 @@
-import { deviceStatus, prepareDevice, summarize, makeQuiz, chunkText } from "./ai.js";
+import { deviceStatus, prepareDevice, summarize, makeQuiz, chunkText, askNotes } from "./ai.js";
 import { readFile } from "./files.js";
 
 const $ = (id) => document.getElementById(id);
@@ -87,6 +87,8 @@ function showTab(name) {
   document.querySelectorAll(".tab").forEach((t) => t.classList.toggle("active", t.dataset.tab === name));
   $("summaryView").hidden = name !== "summary";
   $("quizView").hidden = name !== "quiz";
+  $("askView").hidden = name !== "ask";
+  if (name === "ask") $("askInput").focus();
 }
 
 function setStatus(message, isError = false) {
@@ -98,6 +100,7 @@ function setBusy(value) {
   busy = value;
   summaryBtn.disabled = value;
   quizBtn.disabled = value;
+  $("askBtn").disabled = value;
   document.body.classList.toggle("working", value);
 }
 
@@ -238,6 +241,49 @@ quizBtn.addEventListener("click", async () => {
     setStatus("Done. Tap an option to answer.");
   } catch (error) {
     console.error(error);
+    setStatus(friendlyError(error), true);
+  } finally {
+    setBusy(false);
+    refreshDevice();
+  }
+});
+
+$("askForm").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (busy) return;
+  const question = $("askInput").value.trim();
+  if (question.length < 5) {
+    setStatus("Type a full question first.", true);
+    return;
+  }
+  const chosen = mode();
+  if (!(await canRun(chosen))) return;
+  setBusy(true);
+  showTab("ask");
+  const card = document.createElement("div");
+  card.className = "answer pending";
+  card.innerHTML = `<p class="q">${esc(question)}</p><p class="a">Thinking…</p>`;
+  $("answers").prepend(card);
+  try {
+    await prepareDevice(chosen);
+    const { result, passages, runs } = await askNotes(notes.value.trim(), question, chosen, setStatus);
+    const run = runs[0];
+    const where = run.source === "on_device" ? "On your laptop" : "In the cloud";
+    const sources = passages.map((p) => `<details><summary>Passage ${p.index + 1} of ${p.total}</summary><p>${esc(p.text)}</p></details>`).join("");
+    card.className = "answer " + (result.found ? "found" : "missing");
+    card.innerHTML = `
+      <p class="q">${esc(question)}</p>
+      ${result.found ? "" : `<p class="flag">Not in your notes</p>`}
+      <p class="a">${esc(result.answer)}</p>
+      ${result.quote ? `<blockquote>“${esc(result.quote)}”</blockquote>` : ""}
+      <div class="meta-row"><span class="pill ${run.source === "on_device" ? "local" : "cloud"}">${where} · ${(run.ms / 1000).toFixed(1)}s</span><span>Used ${passages.length} passage${passages.length === 1 ? "" : "s"}</span></div>
+      <div class="sources">${sources}</div>`;
+    showEngine(runs, chosen);
+    $("askInput").value = "";
+    setStatus("Done.");
+  } catch (error) {
+    console.error(error);
+    card.remove();
     setStatus(friendlyError(error), true);
   } finally {
     setBusy(false);

@@ -1,5 +1,6 @@
 import { getGenerativeModel, InferenceMode, Schema } from "firebase/ai";
 import { ai } from "./firebase.js";
+import { findRelevant } from "./ask.js";
 
 const CLOUD_MODEL = "gemini-3.5-flash-lite";
 const CHUNK_CHARS = 9000;
@@ -76,10 +77,40 @@ const quizJson = {
   required: ["questions"],
 };
 
+const askSchema = Schema.object({
+  properties: {
+    found: Schema.boolean(),
+    answer: Schema.string(),
+    quote: Schema.string(),
+  },
+});
+
+const askJson = {
+  type: "object",
+  properties: {
+    found: { type: "boolean" },
+    answer: { type: "string" },
+    quote: { type: "string" },
+  },
+  required: ["found", "answer", "quote"],
+};
+
+const DEVICE_SCHEMAS = new Map([
+  [summarySchema, summaryJson],
+  [quizSchema, quizJson],
+  [askSchema, askJson],
+]);
+
+const KINDS = new Map([
+  [summarySchema, "summary"],
+  [quizSchema, "quiz"],
+  [askSchema, "ask"],
+]);
+
 const models = new Map();
 
 function modelFor(mode, schema) {
-  const key = mode + ":" + (schema === quizSchema ? "quiz" : "summary");
+  const key = mode + ":" + KINDS.get(schema);
   if (models.has(key)) return models.get(key);
   const model = getGenerativeModel(ai, {
     mode: MODES[mode],
@@ -94,7 +125,7 @@ function modelFor(mode, schema) {
         expectedOutputs: [{ type: "text", languages: ["en"] }],
         initialPrompts: [{ role: "system", content: [{ type: "text", value: SYSTEM }] }],
       },
-      promptOptions: { responseConstraint: schema === quizSchema ? quizJson : summaryJson },
+      promptOptions: { responseConstraint: DEVICE_SCHEMAS.get(schema) },
     },
   });
   models.set(key, model);
@@ -119,6 +150,7 @@ export async function prepareDevice(mode, onProgress) {
   if (status === "missing" || status === "unavailable") return;
   const work = modelFor(mode, summarySchema).initializeDeviceModel(onProgress);
   modelFor(mode, quizSchema).initializeDeviceModel();
+  modelFor(mode, askSchema).initializeDeviceModel();
   if (mode === "private") await work;
 }
 
@@ -197,4 +229,18 @@ export async function makeQuiz(summary, mode, onStep) {
     .filter((q) => q.question && Array.isArray(q.options) && q.options.length >= 2)
     .map((q) => ({ ...q, answer: Math.min(Math.max(q.answer | 0, 0), q.options.length - 1) }));
   return { questions, runs: [run] };
+}
+
+export async function askNotes(text, question, mode, onStep) {
+  onStep("Finding the relevant parts of your notes…");
+  const passages = findRelevant(text, question);
+  const context = passages.map((p) => `[Passage ${p.index + 1}]\n${p.text}`).join("\n\n");
+  onStep(`Answering from ${passages.length} passage${passages.length === 1 ? "" : "s"}…`);
+  const prompt =
+    "Answer the student's question using ONLY the notes below.\n" +
+    "If the notes do not contain the answer, set found to false and say briefly what the notes do cover instead.\n" +
+    "Keep the answer to 2 to 5 sentences in simple English. In quote, copy one short sentence from the notes that supports the answer, or leave it empty.\n\n" +
+    "QUESTION: " + question + "\n\nNOTES:\n" + context;
+  const run = await ask(mode, askSchema, prompt);
+  return { result: run.data, passages, runs: [run] };
 }
