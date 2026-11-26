@@ -123,7 +123,7 @@ npx firebase-tools deploy --only hosting
 <table>
   <tr>
     <td align="center"><a href="https://github.com/ShortBatman"><img src="https://github.com/ShortBatman.png" width="80" /><br /><b>Umer Hassan</b></a><br /><sub>App development, Firebase AI Logic, deployment</sub></td>
-    <td align="center"><a href="https://github.com/alihassan-cpp"><img src="https://github.com/alihassan-cpp.png" width="80" /><br /><b>Ali Hassan</b></a><br /><sub>Testing on different hardware and testing overall</sub></td>
+    <td align="center"><a href="https://github.com/alihassan-cpp"><img src="https://github.com/alihassan-cpp.png" width="80" /><br /><b>Ali Hassan</b></a><br /><sub>Testing on different hardware</sub></td>
     <td align="center"><a href="https://github.com/RMIN06"><img src="https://github.com/RMIN06.png" width="80" /><br /><b>Muhammad Ibrahim</b></a><br /><sub>Test material (lecture PDFs)</sub></td>
     <td align="center"><a href="https://github.com/fast-na-ana"><img src="https://github.com/fast-na-ana.png" width="80" /><br /><b>Abdullah Saeed</b></a><br /><sub>Accuracy review and UI feedback</sub></td>
   </tr>
